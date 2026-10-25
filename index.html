@@ -160,15 +160,15 @@
         return d[len1][len2];
       }
 
-      // スライド窓による最良マッチング率の算出
+     // スライド窓による最良マッチング率の算出（窓幅を ±2文字 に拡張）
       function findBestMatch(fullText, targetWord) {
         const targetLen = targetWord.length;
         if (targetLen === 0) return 0;
 
         let maxScore = 0;
-        // ターゲット長 ± 1文字の窓をスライドさせて探索
-        const minWindow = Math.max(1, targetLen - 1);
-        const maxWindow = targetLen + 1;
+        // 誤変換による文字数増減を吸収するため、前後2文字まで探索幅を広げる
+        const minWindow = Math.max(1, targetLen - 2);
+        const maxWindow = targetLen + 2;
 
         for (let w = minWindow; w <= maxWindow; w++) {
           for (let i = 0; i <= fullText.length - w; i++) {
@@ -177,32 +177,36 @@
             const score = 1 - dist / Math.max(sub.length, targetLen);
             if (score > maxScore) {
               maxScore = score;
-              if (maxScore === 1.0) return 1.0; // 完全一致なら即終了
+              if (maxScore === 1.0) return 1.0;
             }
           }
         }
         return maxScore;
       }
 
-      // ファジーサーチ実行関数
+      // ファジーサーチ実行関数（句読点・記号を除去してから照合）
       function matchDrugByFuzzy(inputText) {
-        const normalizedInput = toKatakana(inputText);
+        // 1. カタカナ化
+        let normalized = toKatakana(inputText);
+        // 2. 句読点、記号、スペースを完全に除去して文字の連続性を保つ
+        normalized = normalized.replace(/[\s、。\.・,\-_/]/g, '');
+
         let bestDrugId = null;
         let highestScore = 0;
 
         candidateList.forEach(cand => {
-          const score = findBestMatch(normalizedInput, cand.targetText);
+          const score = findBestMatch(normalized, cand.targetText);
           if (score > highestScore) {
             highestScore = score;
             bestDrugId = cand.id;
           }
         });
 
-        // 類似度が65%以上の場合のみ採用
+        // 類似度が65%以上なら採用
         return highestScore >= 0.65 ? bestDrugId : null;
       }
-
-      // 数値正規化
+      
+            // 数値正規化
       function normalizeText(text) {
         let t = text.replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0));
         t = t.replace(/点/g, '.');
